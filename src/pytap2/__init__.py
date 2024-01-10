@@ -5,6 +5,7 @@ import enum
 import fcntl
 import os
 import struct
+import subprocess
 from typing import Any, Optional
 
 TUNSETIFF = 0x400454CA
@@ -147,6 +148,39 @@ class TapDevice:
         """Write data to the device. No care is taken for MTU limitations or similar."""
         os.write(self._fd, data)
 
+
+    def ipconfig(self, **args: Any) -> None:
+        ...
+        # add tun interface
+        # ip tuntap add mode tun dev tun0
+
+        # add tap interface
+        # ip tuntap add mode tap dev tap0
+
+        # show interface
+        # ip link show dev tun0
+
+        # delete interface
+        # ip link delete <interface_name>
+
+        # set address
+        # ip address add 10.116.0.5/24 dev tun0
+
+        # bring up interface
+        # ip link set dev tun0 up
+
+        # shut down interface
+        # ip link set dev tun0 down
+
+        # set mtu
+        # ip link set dev tun0 mtu 1500
+
+        # set mac address ( only available on tap devices as tun is layer3 )
+        # ip link set dev tap0 address 00:11:22:33:44:55
+
+
+
+
     def ifconfig(self, **args: Any) -> None:
         """Issue ifconfig command on the device.
 
@@ -206,18 +240,22 @@ class TapDevice:
             pass
 
     def up(self) -> None:
-        """Bring up device. This will effectively run "ifconfig up" on the device."""
-        ret = os.system("ifconfig {} up".format(self._name))
-
-        if ret != 0:
-            raise IfconfigError()
+        """Bring up device. using iproute2 or ifconfig"""
+        try:
+            subprocess.run(['ip', 'link', 'set', 'dev', 'tun0', 'up'], check=True)
+        except:
+            subprocess.run(['ifconfig', self._name, 'up'], check=True)
+        except:
+            raise IfconfigError('Unable to set interface {self._name} up Ensure iproute2 ( recommended ) or ifconfig is installed')
 
     def down(self) -> None:
         """Bring down device. This will effectively call "ifconfig down" on the device."""
-        ret = os.system("ifconfig {} down".format(self._name))
-
-        if ret != 0:
-            raise IfconfigError()
+        try:
+            subprocess.run(['ip', 'link', 'set', 'dev', self._name, 'down'], check=True)
+        except:
+            subprocess.run(['ifconfig', self._name, 'down'], check=True)
+        except:
+            raise IfconfigError(f'Unable to set interface {self._name} down. Ensure iproute2 ( recommended ) or ifconfig is installed')
 
     def close(self) -> None:
         """Close the control channel.
